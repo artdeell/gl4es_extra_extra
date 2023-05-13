@@ -785,6 +785,7 @@ char * CoerceIntToFloat(char * source, int * sourceLength){
         // float test=3;        ----- something on both sides, not related to the number.
         // float test=X.2       ----- There is a dot, so it is part of a float already
         // float test = 0.00000 ----- I have to backtrack to find the dot
+        // float test = 4u      ----- I delete the u, then branch back to normal int handling
 
         if(source[i-1] == '.' || source[i+1] == '.') continue;// Number part of a float
         if(isValidFunctionName(source[i - 1])) continue; // Char attached to something related
@@ -807,6 +808,9 @@ char * CoerceIntToFloat(char * source, int * sourceLength){
         // Check if we have the scientific notation
         if(((source[i-1] == '+' || source[i-1] == '-') && (source[i-2] == 'e'|| source[i-2] == 'E'))) continue;
 
+
+        // Remove the potential uint literal marking
+        if(source[i+1] == 'u') source[i+1] = ' ';
 
         // Now we know there is nothing related to the digit, turn it into a float
         source = InplaceInsertByIndex(source, sourceLength, i+1, ".0");
