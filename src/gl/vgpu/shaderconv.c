@@ -14,6 +14,7 @@
 #include "../iProtecc/iprotecc.h"
 
 int NO_OPERATOR_VALUE = 9999;
+int ADDITIVE_OPERATOR_VALUE = 5;
 
 /**
  * Makes more and more destructive conversions to make the shader compile
@@ -206,7 +207,7 @@ char * ConvertShaderVgpu(struct shader_s * shader_source, int second_pass){
     source = WrapBitShiftOperators(source, &sourceLength);
     VerbosePrint(source, "Bit shifts wrapped !");
 
-    source = WrapInclusiveOr(source, &sourceLength);
+    source = WrapBitwiseOrAnd(source, &sourceLength);
     VerbosePrint(source, "Inclusive Or wrapped");
 
     source = SimplifyIntTypecasts(source, &sourceLength);
@@ -694,8 +695,8 @@ char * WrapBitShiftOperators(char * source, int *sourceLength) {
     for(int i=0;i<*sourceLength-2; ++i){
         if((source[i] == '<' && source[i+1] == '<') || (source[i] == '>' && source[i+1] == '>')){
             // A bit shift operator is found
-            char * leftOperand = GetOperandFromOperatorValueOverride(source, i, 0, startPtr, 5);
-            char * rightOperand = GetOperandFromOperatorValueOverride(source,  i+1, 1, endPtr, 5);
+            char * leftOperand = GetOperandFromOperatorValueOverride(source, i, 0, startPtr, GetOperatorValue('<', '<'));
+            char * rightOperand = GetOperandFromOperatorValueOverride(source,  i+1, 1, endPtr, GetOperatorValue('<', '<'));
 
             // Remember to insert from end to start in order to not throw away the result of the operation
             source = InplaceInsertByIndex(source, sourceLength, endIndex + 1, ")");
@@ -711,17 +712,19 @@ char * WrapBitShiftOperators(char * source, int *sourceLength) {
     return source;
 }
 
-char * WrapInclusiveOr(char * source, int *sourceLength) {
+char * WrapBitwiseOrAnd(char * source, int *sourceLength) {
     int startIndex, endIndex = 0;
     int * startPtr = &startIndex, *endPtr = &endIndex;
 
     for(int i=0;i<*sourceLength-2; ++i){
-        if(source[i] == '|' && !(source[i+1] == '|' || source[i-1] == '|')){
+        if((source[i] == '|' && !(source[i+1] == '|' || source[i-1] == '|'))
+        || (source[i] == '&' && !(source[i+1] == '&' || source[i-1] == '&')
+        || (source[i] == '^' && !(source[i+1] == '^' || source[i-1] == '^'))) ){
             // An inclusive operator is found
-            char * leftOperand = GetOperandFromOperatorValueOverride(source, i, 0, startPtr, 6);
-            char * rightOperand = GetOperandFromOperatorValueOverride(source,  i+1, 1, endPtr, 6);
+            char * leftOperand = GetOperandFromOperatorValueOverride(source, i, 0, startPtr, GetOperatorValue(source[i], ' '));
+            char * rightOperand = GetOperandFromOperatorValueOverride(source,  i+1, 1, endPtr, GetOperatorValue(source[i], ' '));
 
-            // Remember to insert from end to start in order to not throw away the result of the operation
+            // Insert from end to start in order to not throw away the result of the index marking operation
             source = InplaceInsertByIndex(source, sourceLength, endIndex + 1, ")");
             source = InplaceInsertByIndex(source, sourceLength, i+2, "int(");
 
@@ -887,14 +890,38 @@ char * ForceIntegerLayoutOutput(char *source, int *sourceLength) {
 }
 
 /** Small helper to help evaluate whether to continue or not I guess
- * Values over 9900 are not for real operators, more like stop indicators*/
-int GetOperatorValue(char operator){
-    if(operator == ',' || operator == ';' || operator == '|') return 9998;
-    if(operator == '=' || operator == '>' || operator == '<') return 9997;
-    if(operator == '+' || operator == '-') return 3;
-    if(operator == '*' || operator == '/' || operator == '%') return 2;
+ * Values over 9900 are not for real operators, more like stop indicators
+ * @param operator The char corresponding to the current operator position
+ * @param operator2 The char corresponding to the current operator position + 1 tp either the left or right. Used to evaluate 2 char operators
+ */
+int GetOperatorValue(char operator, char operator2){
+
+    if(operator == ',' || operator == ';') return 9998;
+
+
+    // Operators will appear reversed depending on the direction of the shader parser
+    if(operator == '|' && operator2 == '|') return 14;
+    if(operator == '^' && operator2 == '^') return 13;
+    if(operator == '&' && operator2 == '&') return 12;
+    if(operator == '|') return 11;
+    if(operator == '^') return 10;
+    if(operator == '&') return 9;
+    if((operator == '=' && operator2 == '=')
+        || (operator == '!' && operator2 == '=')
+        || (operator == '=' && operator2 == '!')) return 8;
+
+    if(operator == '=') return 9997; // Simple assignment is last
+
+    // Note that 6 is evaluated before 7 here
+    if((operator == '<' && operator2 == '<') || (operator == '>' && operator2 == '>')) return 6;
+    if(operator == '<' || operator == '>') return 7; // TODO handle <=/>= ?
+    if(operator == '+' || operator == '-') return ADDITIVE_OPERATOR_VALUE;
+    if(operator == '*' || operator == '/' || operator == '%') return 4;
+
     return NO_OPERATOR_VALUE; // Meaning no value;
 }
+
+
 
 /** Get the left or right operand, given the last index of the operator
  * It bases its ability to get operands by evaluating the priority of operators.
@@ -905,7 +932,12 @@ int GetOperatorValue(char operator){
  * @return newly allocated string with the operand
  */
 char* GetOperandFromOperator(char* source, int operatorIndex, int rightOperand, int * limit){
-    return GetOperandFromOperatorValueOverride(source, operatorIndex, rightOperand, limit, GetOperatorValue(source[operatorIndex]));
+    return GetOperandFromOperatorValueOverride(
+            source,
+            operatorIndex,
+            rightOperand,
+            limit,
+            GetOperatorValue(source[operatorIndex], source[rightOperand ? operatorIndex+1 : operatorIndex-1]));
 }
 
 /** test whether a keyword in present at the left side if the index */
@@ -946,7 +978,7 @@ char* GetOperandFromOperatorValueOverride(char* source, int operatorIndex, int r
             }
 
             // Special case for unary operator when parsing to the right
-            if(GetOperatorValue(source[stringIndex]) == 3 ){ // 3 is +- operators
+            if(GetOperatorValue(source[stringIndex], source[stringIndex+parserDirection]) == ADDITIVE_OPERATOR_VALUE ){ // 5 is +- operators
                 stringIndex += parserDirection;
             }
         }
@@ -995,7 +1027,7 @@ char* GetOperandFromOperatorValueOverride(char* source, int operatorIndex, int r
         // 3 - No fuckery with operators like "test = +-+-+-+-+-+-+-+-3;" although I attempt to support them
 
         // Higher value operators have less priority
-        int currentValue = GetOperatorValue(source[stringIndex]);
+        int currentValue = GetOperatorValue(source[stringIndex], source[stringIndex + parserDirection]);
 
 
         // The condition is different due to the evaluation order which is left to right, aside from the unary operators
@@ -1020,7 +1052,7 @@ char* GetOperandFromOperatorValueOverride(char* source, int operatorIndex, int r
             }
 
             // Special case when parsing unary operator to the right
-            if(rightOperand && operatorValue == 3 && lastOperator < currentValue){
+            if(rightOperand && operatorValue == ADDITIVE_OPERATOR_VALUE && lastOperator < currentValue){
                 stringIndex += parserDirection;
                 continue;
             }
@@ -1035,13 +1067,13 @@ char* GetOperandFromOperatorValueOverride(char* source, int operatorIndex, int r
         }
 
         // Special case for unary operators from the right
-        if(rightOperand && operatorValue == 3) { // 3 is + - operators
+        if(rightOperand && operatorValue == ADDITIVE_OPERATOR_VALUE) { // 5 is + - operators
             lastOperator = currentValue;
         } // Special case for unary operators from the left
-        if(!rightOperand && operatorValue < 3 && currentValue == 3){
+        if(!rightOperand && operatorValue < ADDITIVE_OPERATOR_VALUE && currentValue == ADDITIVE_OPERATOR_VALUE){
             lastOperator = NO_OPERATOR_VALUE;
             for(int j=1; 1; ++j){
-                int subCurrentValue = GetOperatorValue(source[stringIndex - j]);
+                int subCurrentValue = GetOperatorValue(source[stringIndex - j], source[stringIndex - j + parserDirection]);
                 if(subCurrentValue != NO_OPERATOR_VALUE){
                     lastOperator = subCurrentValue;
                     continue;

@@ -16,7 +16,7 @@ char * ForceIntegerArrayAccess(char* source, int * sourceLength);
 char * CoerceIntToFloat(char * source, int * sourceLength);
 char * ReplaceModOperator(char * source, int * sourceLength);
 char * WrapBitShiftOperators(char * source, int *sourceLength);
-char * WrapInclusiveOr(char * source, int *sourceLength);
+char * WrapBitwiseOrAnd(char * source, int *sourceLength);
 char * WrapIvecFunctions(char * source, int * sourceLength);
 char * WrapFunction(char * source, int * sourceLength, char * functionName, char * wrapperFunctionName, char * wrapperFunction);
 int FindPositionAfterDirectives(char * source);
@@ -51,5 +51,6 @@ char * SimplifyIntTypecasts(char * source, int * sourceLength);
 
 char* GetOperandFromOperator(char* source, int operatorIndex, int rightOperand, int * limit);
 char* GetOperandFromOperatorValueOverride(char* source, int operatorIndex, int rightOperand, int * limit, int overrideTokenValue);
+int GetOperatorValue(char operator, char operator2);
 
 #endif //UNTITLED_SHADERCONV_H
