@@ -368,14 +368,13 @@ char * FixSimpleSwitchCases(char *source, int *sourceLength){
         if(startIndex == 0) break;
 
         // Reach the floating dot, fail otherwise
-        unsigned long floatingIndex = GetNextTokenPosition(source + offset, startIndex, '.', "\\:");
-        if(floatingIndex == startIndex) break;
+        unsigned long floatingIndex = GetNextTokenPosition(source + offset, startIndex, '.', "\\:()/+-");
+        if(floatingIndex == startIndex) {
+            offset += startIndex + 5; // 5 just to get ahead of the case statement
+            continue;
+        }
 
         source = InplaceReplaceByIndex(source, sourceLength, offset + floatingIndex, offset + floatingIndex + 1, "");
-
-        // Replace the .0 part by empty spaces
-        //source[offset + floatingIndex] = ' ';
-        //source[offset + floatingIndex + 1] = ' ';
 
         offset += startIndex + 5; // 5 just to get ahead of the case statement
     }
