@@ -48,6 +48,8 @@ EGLBoolean gl4es_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface);
 EGLBoolean gl4es_eglCopyBuffers(EGLDisplay dpy, EGLSurface surface, EGLNativePixmapType target);
 void* gl4es_eglGetProcAddress(const char *name);
 
+void egl_getMainFBSize(EGLint* width, EGLint* height);
+
 EGLSyncKHR gl4es_eglCreateSyncKHR(EGLDisplay dpy, EGLenum type, const EGLint *attrib_list);
 EGLint gl4es_eglClientWaitSyncKHR(EGLDisplay dpy, EGLSyncKHR sync, EGLint flags, EGLTimeKHR timeout);
 
