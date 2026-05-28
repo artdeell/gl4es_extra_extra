@@ -1,7 +1,6 @@
 
 #include "egl.h"
 #include "../gl/loader.h"
-#include "../gl/gles.h"
 #include "../glx/hardext.h"
 
 #ifndef AliasExport
