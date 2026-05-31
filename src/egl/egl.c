@@ -225,8 +225,10 @@ NativePixmapType gl4es_egl_destroy_pixmap_ID_mapping(int id)
 
 void egl_getMainFBSize(EGLint* width, EGLint* height)
 {
-   gl4es_eglQuerySurface(gl4es_eglGetCurrentDisplay(), gl4es_eglGetCurrentSurface(EGL_DRAW), EGL_WIDTH, width);
-   gl4es_eglQuerySurface(gl4es_eglGetCurrentDisplay(), gl4es_eglGetCurrentSurface(EGL_DRAW), EGL_HEIGHT, height); 
+   EGLDisplay *display = gl4es_eglGetCurrentDisplay();
+   EGLSurface *surface = gl4es_eglGetCurrentSurface(EGL_DRAW);
+   gl4es_eglQuerySurface(display, surface, EGL_WIDTH, width);
+   gl4es_eglQuerySurface(display, surface, EGL_HEIGHT, height); 
 }
 
 AliasExport(EGLint, eglGetError,,(void));
